@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth'; // Assuming you have an authentication module
-import prisma from '@/lib/prisma'; // Prisma client
+import { auth } from '@/auth';
+import prisma from '@/lib/prisma';
 
 // GET handler to fetch all todos for the authenticated user
 export async function GET() {
