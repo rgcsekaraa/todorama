@@ -22,7 +22,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      session.user.id = token.id as string; // Add type assertion here
+      session.user.id = token.id;
       return session;
     },
   },

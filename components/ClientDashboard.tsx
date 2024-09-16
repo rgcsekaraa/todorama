@@ -1,10 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CalendarDays, Plus, Trash2, LogOut, Moon, Sun } from 'lucide-react';
+import {
+  CalendarDays,
+  Plus,
+  Trash2,
+  LogOut,
+  Moon,
+  Sun,
+  Edit,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Confetti from 'react-confetti';
 import { signOut, useSession } from 'next-auth/react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -32,6 +41,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Todo {
   id: string;
@@ -46,12 +56,31 @@ export default function Dashboard() {
   const [currentAction, setCurrentAction] = useState<{
     type: 'complete' | 'delete';
     id: string;
+    checked?: boolean;
   } | null>(null);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [confettiOpacity, setConfettiOpacity] = useState(1);
   const { data: session } = useSession();
+  const [loadingTodos, setLoadingTodos] = useState(false);
+  const [addingTodo, setAddingTodo] = useState(false);
+  const [confirmingAction, setConfirmingAction] = useState(false);
+
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [todoToEdit, setTodoToEdit] = useState<Todo | null>(null);
+  const [editText, setEditText] = useState('');
+
+  const validateTodoInput = (input: string): boolean => {
+    if (input.trim().length === 0) {
+      setErrorMessage('Task cannot be empty');
+      return false;
+    }
+    setErrorMessage(''); // Clear the error message if validation passes
+    return true;
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -81,77 +110,137 @@ export default function Dashboard() {
 
   const fetchTodos = async () => {
     try {
+      setLoadingTodos(true);
       const response = await fetch('/api/todos');
       if (!response.ok) {
         throw new Error(`Failed to fetch todos: ${response.statusText}`);
       }
 
-      const text = await response.text(); // Use text() to check if response has content
-      const data = text ? JSON.parse(text) : []; // Parse only if there's content
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : [];
       setTodos(data);
     } catch (error) {
       console.error('Error fetching todos:', error);
-      setTodos([]); // Fallback to empty array if an error occurs
+      setTodos([]);
+    } finally {
+      setLoadingTodos(false);
     }
   };
 
   const addTodo = async () => {
-    if (newTodo.trim() !== '') {
-      try {
-        const response = await fetch('/api/todos', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ text: newTodo }),
-        });
-        if (!response.ok) {
-          throw new Error(`Failed to add todo: ${response.statusText}`);
-        }
+    if (!validateTodoInput(newTodo)) {
+      return;
+    }
 
-        const text = await response.text(); // Use text() to check if response has content
-        const data = text ? JSON.parse(text) : null; // Parse only if there's content
-        if (data) {
-          setTodos([...todos, data]);
-        }
-        setNewTodo('');
-      } catch (error) {
-        console.error('Error adding todo:', error);
+    try {
+      setAddingTodo(true);
+      const response = await fetch('/api/todos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: newTodo }),
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to add todo: ${response.statusText}`);
       }
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+      if (data) {
+        setTodos([...todos, data]);
+      }
+      setNewTodo('');
+    } catch (error) {
+      console.error('Error adding todo:', error);
+    } finally {
+      setAddingTodo(false);
     }
   };
 
-  const openDialog = (type: 'complete' | 'delete', id: string) => {
-    setCurrentAction({ type, id });
+  const openDialog = (
+    type: 'complete' | 'delete',
+    id: string,
+    checked?: boolean
+  ) => {
+    setCurrentAction({ type, id, checked });
     setDialogOpen(true);
   };
 
   const handleConfirm = async () => {
     if (currentAction) {
-      if (currentAction.type === 'complete') {
-        const todoToUpdate = todos.find((todo) => todo.id === currentAction.id);
-        if (todoToUpdate) {
-          const response = await fetch(`/api/todos/${currentAction.id}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ completed: !todoToUpdate.completed }),
-          });
-          const updatedTodo = await response.json();
-          setTodos(
-            todos.map((todo) =>
-              todo.id === updatedTodo.id ? updatedTodo : todo
-            )
+      try {
+        setConfirmingAction(true);
+        if (currentAction.type === 'complete') {
+          const todoToUpdate = todos.find(
+            (todo) => todo.id === currentAction.id
           );
-          setShowConfetti(true);
+          if (todoToUpdate) {
+            const response = await fetch(`/api/todos/${currentAction.id}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ completed: currentAction.checked }),
+            });
+            const updatedTodo = await response.json();
+            setTodos(
+              todos.map((todo) =>
+                todo.id === updatedTodo.id ? updatedTodo : todo
+              )
+            );
+            if (currentAction.checked) {
+              setShowConfetti(true);
+            }
+          }
+        } else if (currentAction.type === 'delete') {
+          await fetch(`/api/todos/${currentAction.id}`, { method: 'DELETE' });
+          setTodos(todos.filter((todo) => todo.id !== currentAction.id));
         }
-      } else if (currentAction.type === 'delete') {
-        await fetch(`/api/todos/${currentAction.id}`, { method: 'DELETE' });
-        setTodos(todos.filter((todo) => todo.id !== currentAction.id));
+      } catch (error) {
+        console.error('Error during confirmation:', error);
+      } finally {
+        setConfirmingAction(false);
+        setDialogOpen(false);
       }
+    } else {
+      setDialogOpen(false);
     }
-    setDialogOpen(false);
+  };
+
+  const openEditDialog = (todo: Todo) => {
+    setTodoToEdit(todo);
+    setEditText(todo.text);
+    setEditDialogOpen(true);
+  };
+
+  const handleEditConfirm = async () => {
+    if (todoToEdit) {
+      try {
+        setConfirmingAction(true);
+        const response = await fetch(`/api/todos/${todoToEdit.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ text: editText }),
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to update todo: ${response.statusText}`);
+        }
+        const updatedTodo = await response.json();
+        setTodos(
+          todos.map((todo) => (todo.id === updatedTodo.id ? updatedTodo : todo))
+        );
+      } catch (error) {
+        console.error('Error updating todo:', error);
+      } finally {
+        setConfirmingAction(false);
+        setEditDialogOpen(false);
+      }
+    } else {
+      setEditDialogOpen(false);
+    }
   };
 
   const handleLogout = () => {
@@ -253,60 +342,139 @@ export default function Dashboard() {
               value={newTodo}
               onChange={(e) => setNewTodo(e.target.value)}
               className="flex-grow"
+              disabled={addingTodo}
             />
-            <Button onClick={addTodo}>
-              <Plus className="w-4 h-4 mr-2" />
-              ADD
+            <Button onClick={addTodo} disabled={addingTodo}>
+              {addingTodo ? (
+                <>
+                  <Plus className="w-4 h-4 mr-2 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  ADD
+                </>
+              )}
             </Button>
           </div>
+          {/* Show the shadcn Alert if there's an error */}
+          {errorMessage && (
+            <Alert variant="destructive" className="mb-2">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
+          )}
           <ScrollArea className="h-[300px] w-full rounded-md border p-4">
-            <ul className="space-y-2">
-              {todos.map((todo) => (
-                <li key={todo.id} className="flex items-center gap-2">
-                  <Checkbox
-                    checked={todo.completed}
-                    onCheckedChange={() => openDialog('complete', todo.id)}
-                    id={`todo-${todo.id}`}
-                  />
-                  <Label
-                    htmlFor={`todo-${todo.id}`}
-                    className={`flex-grow ${
-                      todo.completed ? 'line-through text-muted-foreground' : ''
-                    }`}
-                  >
-                    {todo.text}
-                  </Label>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openDialog('delete', todo.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
+            {loadingTodos ? (
+              <ul className="space-y-2">
+                {[...Array(5)].map((_, index) => (
+                  <li key={index} className="flex items-center gap-2">
+                    <Skeleton className="w-5 h-5 rounded" />
+                    <Skeleton className="flex-grow h-4 rounded" />
+                    <Skeleton className="w-8 h-8 rounded-full" />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ul className="space-y-2">
+                {todos.map((todo) => (
+                  <li key={todo.id} className="flex items-center gap-2">
+                    <Checkbox
+                      checked={todo.completed}
+                      onCheckedChange={(checked) =>
+                        openDialog('complete', todo.id, checked as boolean)
+                      }
+                      id={`todo-${todo.id}`}
+                    />
+                    <Label
+                      htmlFor={`todo-${todo.id}`}
+                      className={`flex-grow ${
+                        todo.completed
+                          ? 'line-through text-muted-foreground'
+                          : ''
+                      }`}
+                    >
+                      {todo.text}
+                    </Label>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEditDialog(todo)}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openDialog('delete', todo.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </ScrollArea>
         </CardContent>
 
+        {/* Confirmation Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Confirm Action</DialogTitle>
               <DialogDescription>
                 {currentAction?.type === 'complete'
-                  ? 'Are you sure you want to mark this task as done?'
+                  ? currentAction.checked
+                    ? 'Are you sure you want to mark this task as done?'
+                    : 'Are you sure you want to undo? 😢'
                   : 'Are you sure you want to delete this task?'}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+                disabled={confirmingAction}
+              >
                 Cancel
               </Button>
-              <Button onClick={handleConfirm}>Confirm</Button>
+              <Button onClick={handleConfirm} disabled={confirmingAction}>
+                {confirmingAction ? <>Confirming...</> : 'Confirm'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Task</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="edit-todo">Task</Label>
+              <Input
+                id="edit-todo"
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setEditDialogOpen(false)}
+                disabled={confirmingAction}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleEditConfirm} disabled={confirmingAction}>
+                {confirmingAction ? 'Saving...' : 'Save'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <CardContent className="flex justify-center">
           <span className="text-xs text-gray-500">
             @2024 Todorama. All rights reserved.

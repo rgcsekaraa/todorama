@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
-import prisma from '@/lib/prisma';
+import { auth } from '@/auth'; // Assuming you have an authentication module
+import prisma from '@/lib/prisma'; // Prisma client
 
+// PUT handler to update the "completed" status or text of a specific todo
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -13,29 +14,37 @@ export async function PUT(
   }
 
   try {
-    const { completed } = await req.json();
+    const { completed, text } = await req.json();
 
-    if (typeof completed !== 'boolean') {
+    const data: any = {};
+    if (text !== undefined) {
+      data.text = text;
+    }
+    if (typeof completed === 'boolean') {
+      data.completed = completed;
+    }
+
+    if (Object.keys(data).length === 0) {
       return NextResponse.json(
-        { error: 'Invalid completed status' },
+        { error: 'No valid fields to update' },
         { status: 400 }
       );
     }
 
+    // Update the todo if it belongs to the authenticated user
     const todo = await prisma.todo.updateMany({
       where: {
         id: params.id,
-        userId: session.user.id,
+        userId: session.user.id, // Ensure todo belongs to the authenticated user
       },
-      data: {
-        completed,
-      },
+      data,
     });
 
     if (todo.count === 0) {
       return NextResponse.json({ error: 'Todo not found' }, { status: 404 });
     }
 
+    // Fetch the updated todo
     const updatedTodo = await prisma.todo.findUnique({
       where: { id: params.id },
     });
@@ -50,6 +59,7 @@ export async function PUT(
   }
 }
 
+// DELETE handler to delete a specific todo
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -64,7 +74,7 @@ export async function DELETE(
     const todo = await prisma.todo.deleteMany({
       where: {
         id: params.id,
-        userId: session.user.id,
+        userId: session.user.id, // Ensure todo belongs to the authenticated user
       },
     });
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
-import prisma from '@/lib/prisma';
+import { auth } from '@/auth'; // Assuming you have an authentication module
+import prisma from '@/lib/prisma'; // Prisma client
 
+// GET handler to fetch all todos for the authenticated user
 export async function GET() {
   const session = await auth();
 
@@ -29,6 +30,7 @@ export async function GET() {
   }
 }
 
+// POST handler to create a new todo for the authenticated user
 export async function POST(req: NextRequest) {
   const session = await auth();
 
@@ -39,15 +41,17 @@ export async function POST(req: NextRequest) {
   try {
     const { text } = await req.json();
 
+    // Validate todo text input
     if (!text || typeof text !== 'string') {
       return NextResponse.json({ error: 'Invalid todo text' }, { status: 400 });
     }
 
+    // Create new todo associated with the authenticated user
     const todo = await prisma.todo.create({
       data: {
         text,
         completed: false,
-        userId: session.user.id, // Here we're sure that session.user.id is a string
+        userId: session.user.id, // Correct association with user
       },
     });
 
