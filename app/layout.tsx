@@ -1,6 +1,7 @@
 import './globals.css';
 import localFont from 'next/font/local';
 import { Providers } from './providers';
+import Head from './Head';
 
 // Font configuration
 const geistSans = localFont({
@@ -14,15 +15,6 @@ const geistMono = localFont({
   weight: '100 900',
 });
 
-// Add metadata export
-export const metadata = {
-  title: 'Todorama',
-  description: 'Organize your tasks efficiently with Todorama.',
-  icons: {
-    icon: '/favicon.ico',
-  },
-};
-
 export default function RootLayout({
   children,
 }: {
@@ -30,6 +22,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <Head />
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

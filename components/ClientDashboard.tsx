@@ -215,6 +215,10 @@ export default function Dashboard() {
   };
 
   const handleEditConfirm = async () => {
+    if (!validateTodoInput(editText)) {
+      return; // Exit if validation fails
+    }
+
     if (todoToEdit) {
       try {
         setConfirmingAction(true);
