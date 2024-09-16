@@ -381,41 +381,48 @@ export default function Dashboard() {
                 ))}
               </ul>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-2 w-full">
                 {todos.map((todo) => (
-                  <li key={todo.id} className="flex items-center gap-2">
+                  <li
+                    key={todo.id}
+                    className="grid grid-cols-[auto_1fr_auto] items-center gap-2 max-w-full"
+                  >
                     <Checkbox
                       checked={todo.completed}
                       onCheckedChange={(checked) =>
-                        openDialog('complete', todo.id, checked as boolean)
+                        openDialog('complete', todo.id, checked)
                       }
                       id={`todo-${todo.id}`}
+                      className="col-start-1"
                     />
                     <Label
                       htmlFor={`todo-${todo.id}`}
-                      className={`flex-grow truncate ${
+                      className={`col-start-2 truncate ${
                         todo.completed
                           ? 'line-through text-muted-foreground'
                           : ''
                       }`}
-                      style={{ maxWidth: '250px' }} // Adjust max width to your design
                     >
                       {todo.text}
                     </Label>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openEditDialog(todo)}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openDialog('delete', todo.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="col-start-3 flex items-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEditDialog(todo)}
+                        className="shrink-0"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openDialog('delete', todo.id)}
+                        className="shrink-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </li>
                 ))}
               </ul>
