@@ -393,11 +393,12 @@ export default function Dashboard() {
                     />
                     <Label
                       htmlFor={`todo-${todo.id}`}
-                      className={`flex-grow ${
+                      className={`flex-grow truncate ${
                         todo.completed
                           ? 'line-through text-muted-foreground'
                           : ''
                       }`}
+                      style={{ maxWidth: '250px' }} // Adjust max width to your design
                     >
                       {todo.text}
                     </Label>
